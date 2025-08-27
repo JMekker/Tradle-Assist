@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const dom = document.querySelector(selector);
 		const chart = echarts.init(dom, null, { renderer: "canvas", useDirtyRect: false });
 		const worldJson = await fetch("./data/asset/geo/world.json").then(r => r.json());
+		await subsequenceNormalizeGeo(worldJson);
 		echarts.registerMap("world", worldJson);
 		const { lines, byName } = buildBorderLinesFromGeoJSON(worldJson);
 
@@ -297,6 +298,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			const rows = j.members || j.data || [];
 			const map = new Map();
 			for (const r of rows) map.set((r.caption || r.name || "").trim(), r.key || null);
+			console.log(map);
 			return map;
 		}
 	
@@ -317,9 +319,10 @@ document.addEventListener("DOMContentLoaded", function () {
 			return res.json();
 		}
 	
-		async function preloadAllOEC(byName, { drilldown = "HS4", year = "2023", locale = "en", concurrency = 6 } = {}) {
+		async function preloadAllOEC(byName, { drilldown = "HS4", year = "2023", locale = "en", concurrency = 8 } = {}) {
 			const members = await fetchOECMembersMap(locale);
 			const names = [...byName.keys()];
+			console.log(byName);
 			let i = 0;
 			async function worker() {
 				while (i < names.length) {
@@ -418,25 +421,108 @@ document.addEventListener("DOMContentLoaded", function () {
 		window.addEventListener("resize", chart.resize);
 	}
 
-	function buildBorderLinesFromGeoJSON(geo) {
-		const features = geo.features || [];
-		const lines = [];
-		const byName = new Map();
-		for (const f of features) {
+	async function subsequenceNormalizeGeo(geo) {
+		const ref = await fetch("https://cdn.jsdelivr.net/npm/world-countries@4/countries.json").then(r => r.json());
+
+		const strip = s =>
+			s?.normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "";
+
+		const letters = s =>
+			strip(s).toLowerCase().replace(/[^a-z]/g, "");
+
+		const words = s =>
+			strip(s)
+				.toLowerCase()
+				.replace(/[^a-z\s]/g, " ")
+				.replace(/\s+/g, " ")
+				.trim()
+				.split(" ")
+				.filter(Boolean);
+
+		const isSubseq = (a, b) => {
+			let i = 0;
+			for (const ch of a) {
+				i = b.indexOf(ch, i);
+				if (i < 0) return false;
+				i++;
+			}
+			return true;
+		};
+
+		const uniq = arr => [...new Set(arr)];
+
+		const cand = uniq(
+			ref.flatMap(c => [c.name?.common, c.name?.official]).filter(Boolean)
+		).map(x => ({
+			raw: x,
+			L: letters(x),
+			W: words(x)
+		}));
+
+		const score = (aWords, bWords) => {
+			const A = new Set(aWords);
+			const B = new Set(bWords);
+			let inter = 0;
+			for (const t of A) if (B.has(t)) inter++;
+			const jac = inter / (new Set([...A, ...B]).size || 1);
+			return jac + Math.min(aWords.length, bWords.length) / Math.max(aWords.length, bWords.length, 1);
+		};
+
+		for (const f of (geo.features || [])) {
 			const name =
+				f.properties?.name_full ||
 				f.properties?.name_en ||
 				f.properties?.name ||
 				f.properties?.NAME ||
 				f.properties?.ADMIN ||
 				"";
+
+			const kL = letters(name);
+			if (!kL) continue;
+
+			const hits = cand.filter(c => isSubseq(kL, c.L));
+			if (!hits.length) continue;
+
+			let pick = hits[0];
+			if (hits.length > 1) {
+				const kW = words(name);
+				pick = hits
+					.map(c => [c, score(kW, c.W), c.L.length])
+					.sort((a, b) => b[1] - a[1] || b[2] - a[2])[0][0];
+			}
+
+			const full = pick.raw;
+			if (full) {
+				f.properties.name_full = full;
+				f.properties.name_en = full;
+			}
+		}
+
+		return geo;
+	}
+
+	function buildBorderLinesFromGeoJSON(geo) {
+		const features = geo.features || [];
+		const lines = [];
+		const byName = new Map();
+
+		for (const f of features) {
+			const name = f.properties?.name_full ||
+				f.properties?.name_en ||
+				f.properties?.name ||
+				f.properties?.NAME ||
+				f.properties?.ADMIN ||
+				"";
+
 			byName.set(name, f);
-	
+
 			const geom = f.geometry;
 			if (!geom) continue;
+
 			const polys =
 				geom.type === "Polygon" ? [geom.coordinates] :
 				geom.type === "MultiPolygon" ? geom.coordinates : [];
-	
+
 			for (const poly of polys) {
 				for (const ring of poly) {
 					const coords = ring.map(([lon, lat]) => [lon, lat]);
@@ -475,5 +561,9 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	initWorldGlobe('.container');
+
+	setTimeout(() => {
+	    document.querySelector('.loading').style.display = 'none';
+	}, 8000);
 
 });

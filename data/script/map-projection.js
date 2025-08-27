@@ -234,9 +234,15 @@ document.addEventListener("DOMContentLoaded", function () {
 			},
 			globe: {
 				baseTexture: "./data/asset/geo/land_shallow_topo_10800.png",
-				shading: "color",
+				heightTexture: "./data/asset/geo/land_shallow_bump_5400.png",
+				displacementScale: 0.05,
+				shading: "realistic",
+				realisticMaterial: {
+					roughness: 0.8,
+					metalness: 0
+				},
 				light: {
-					main: { intensity: 0 },
+					main: { intensity: 0.5 },
 					ambient: { intensity: 1.2 }
 				},
 				environment: "./data/asset/img/galactic_plane_no_nebulae_2.png",
@@ -563,7 +569,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	initWorldGlobe('.container');
 
 	setTimeout(() => {
-	    document.querySelector('.loading').style.display = 'none';
+			document.querySelector('.loading').style.display = 'none';
 	}, 8000);
 
 });

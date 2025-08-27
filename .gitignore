@@ -1,0 +1,5 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+data/asset/geo/land_shallow_topo_21600.png

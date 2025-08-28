@@ -1,3 +1,12 @@
+const overlays = {
+	iron: { id:"iron", texture:"./data/asset/overlay/iron_deposits_5400.png", blendTo:"emission", distance:2 },
+	copper: { id:"copper", texture:"./data/asset/overlay/copper_deposits_5400.png", blendTo:"emission", distance:2 },
+	landtemp: { id:"landtemp", texture:"./data/asset/overlay/land_surface_temp_5400.png", blendTo:"emission", distance:1 },
+	seatemp: { id:"seatemp", texture:"./data/asset/overlay/sea_surface_temp_5400.png", blendTo:"emission", distance:1 },
+	pop_2000: { id:"pop_2000", texture:"./data/asset/overlay/SEDAC_POP_2000.png", blendTo:"base", distance:4 },
+	night: { id:"night", texture:"./data/asset/overlay/BlackMarble_2016_3km.jpg", blendTo:"base", distance:3 }
+};
+
 document.addEventListener("DOMContentLoaded", function () {
 	
 	async function initWorldGlobe(selector) {
@@ -251,7 +260,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					zoomSensitivity: 2,
 					alpha: 20,
 					beta: 90,
-					minDistance: 75,
+					minDistance: 20,
 					maxDistance: 200
 				}
 			},
@@ -304,7 +313,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			const rows = j.members || j.data || [];
 			const map = new Map();
 			for (const r of rows) map.set((r.caption || r.name || "").trim(), r.key || null);
-			console.log(map);
 			return map;
 		}
 	
@@ -328,7 +336,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		async function preloadAllOEC(byName, { drilldown = "HS4", year = "2023", locale = "en", concurrency = 8 } = {}) {
 			const members = await fetchOECMembersMap(locale);
 			const names = [...byName.keys()];
-			console.log(byName);
 			let i = 0;
 			async function worker() {
 				while (i < names.length) {
@@ -351,6 +358,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	
 		chart.setOption(option, true);
+		wireOverlayUI(chart);
 	
 		oecPreloadPromise = preloadAllOEC(byName, { drilldown: "HS4", year: "2023", locale: "en", concurrency: 8 });
 
@@ -372,29 +380,61 @@ document.addEventListener("DOMContentLoaded", function () {
 		let selA = null, selB = null;
 		let selAName = "", selBName = "";
 
+		function flightTimeHours(km, speedKmh = 900) {
+			return km / speedKmh;
+		}
+
 		function updateMeasure() {
 			const s = [];
+			if (selA && selB) s.push({ coords: [[selA[0], selA[1], 0], [selB[0], selB[1], 0]] });
+			const aData = selA ? [{ name: selAName, value: [selA[0], selA[1], 0] }] : [];
+			const bData = selB ? [{ name: selBName, value: [selB[0], selB[1], 0] }] : [];
+			let text = "";
 			if (selA && selB) {
-				s.push({ coords: [[selA[0], selA[1], 0], [selB[0], selB[1], 0]] });
+				const km = haversineKm(selA, selB);
+				const hours = flightTimeHours(km);
+				text = `${selAName} → ${selBName}: ${km.toFixed(0)} km (${hours.toFixed(1)} h flight)`;
+			} else if (selA) {
+				text = `${selAName} → `;
 			}
 			chart.setOption({
-				series: [{
-					id: "measureLine",
-					type: "lines3D",
-					coordinateSystem: "globe",
-					data: s,
-					polyline: false,
-					silent: true,
-					lineStyle: { width: 3, color: "#12d7ff", opacity: 0.5 }
-				}],
-				graphic: selA && selB
+				series: [
+					{
+						id: "measureLine",
+						type: "lines3D",
+						coordinateSystem: "globe",
+						data: s,
+						polyline: false,
+						silent: true,
+						lineStyle: { width: 3, color: "#12d7ff", opacity: 0.5 }
+					},
+					{
+						id: "selMarkerA",
+						type: "scatter3D",
+						coordinateSystem: "globe",
+						data: aData,
+						symbolSize: 12,
+						itemStyle: { color: "#12d7ff", opacity: 1 },
+						label: { show: true, formatter: p => p.name, position: "top", textStyle: { fontSize: 12, color: "#fff" } }
+					},
+					{
+						id: "selMarkerB",
+						type: "scatter3D",
+						coordinateSystem: "globe",
+						data: bData,
+						symbolSize: 12,
+						itemStyle: { color: "#12d7ff", opacity: 1 },
+						label: { show: true, formatter: p => p.name, position: "top", textStyle: { fontSize: 12, color: "#fff" } }
+					}
+				],
+				graphic: text
 					? [{
 						id: "measureText",
 						type: "text",
 						left: 12,
-						top: 12,
+						bottom: 12,
 						style: {
-							text: `${selAName} → ${selBName}: ${haversineKm(selA, selB).toFixed(0)} km`,
+							text,
 							font: "600 14px system-ui, -apple-system, Segoe UI, Roboto, Arial",
 							fill: "#fff",
 							lineWidth: 2,
@@ -405,7 +445,10 @@ document.addEventListener("DOMContentLoaded", function () {
 			}, false, true);
 		}
 
+		const clearBtn = document.createElement("button");
+
 		chart.on("click", p => {
+			clearBtn.style.display = "block";
 			if (p.seriesType !== "scatter3D") return;
 			const name = p.name || "";
 			const v = centerMap.get(name) || p.value;
@@ -423,6 +466,32 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			updateMeasure();
 		});
+
+		clearBtn.textContent = "Clear";
+		clearBtn.style.display = "none";
+		clearBtn.style.position = "absolute";
+		clearBtn.style.left = "12px";
+		clearBtn.style.bottom = "40px";
+		clearBtn.style.padding = "6px 12px";
+		clearBtn.style.font = "600 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+		clearBtn.style.background = "#222";
+		clearBtn.style.color = "#fff";
+		clearBtn.style.border = "1px solid #555";
+		clearBtn.style.borderRadius = "6px";
+		clearBtn.style.cursor = "pointer";
+		clearBtn.style.zIndex = 1000;
+
+		clearBtn.addEventListener("click", () => {
+			clearBtn.style.display = "none";
+			selA = null;
+			selB = null;
+			selAName = "";
+			selBName = "";
+			updateMeasure();
+		});
+
+		dom.style.position = "relative";
+		dom.appendChild(clearBtn);
 	
 		window.addEventListener("resize", chart.resize);
 	}
@@ -573,3 +642,44 @@ document.addEventListener("DOMContentLoaded", function () {
 	}, 8000);
 
 });
+
+function buildGlobeLayers(activeIds) {
+	const out = [];
+	for (const id of activeIds) {
+		const o = overlays[id];
+		if (!o) continue;
+		out.push({ type: "blend", blendTo: o.blendTo || "emission", texture: o.texture, intensity: 1 });
+	}
+	return out;
+}
+
+function currentOverlayIds() {
+	const ids = [];
+	if (document.getElementById("ov-iron")?.checked) ids.push("iron");
+	if (document.getElementById("ov-copper")?.checked) ids.push("copper");
+	if (document.getElementById("ov-landtemp")?.checked) ids.push("landtemp");
+	if (document.getElementById("ov-seatemp")?.checked) ids.push("seatemp");
+	if (document.getElementById("ov-pop_2000")?.checked) ids.push("pop_2000");
+	if (document.getElementById("ov-night")?.checked) ids.push("night");
+	return ids;
+}
+
+function wireOverlayUI(chart) {
+	const inputs = [
+		document.getElementById("ov-iron"),
+		document.getElementById("ov-copper"),
+		document.getElementById("ov-landtemp"),
+		document.getElementById("ov-seatemp"),
+		document.getElementById("ov-pop_2000"),
+		document.getElementById("ov-night")
+	].filter(Boolean);
+	function push(){
+		const ids = currentOverlayIds();
+		const newLayers = buildGlobeLayers(ids);
+		const opt = chart.getOption();
+		opt.globe[0].layers = newLayers;
+		chart.setOption(opt, true);
+	}
+	for (const el of inputs) el.addEventListener("change", push);
+	push();
+}

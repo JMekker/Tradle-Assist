@@ -22,5 +22,15 @@
 	<script src="https://cdn.jsdelivr.net/npm/d3-geo@3/dist/d3-geo.min.js"></script>
 
 	<script src="./data/script/map-projection.js"></script>
+
+	<div class="overlay-panel" style="position:absolute; right:12px; bottom:12px; z-index:10; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); padding:10px 12px; border-radius:12px; color:#fff; font:500 12px system-ui,-apple-system,Segoe UI,Roboto,Arial; display:flex; flex-direction:column; gap:8px;">
+<!-- 		<div style="display:flex; align-items:center; gap:8px;"><input disabled id="ov-iron" type="checkbox" /><label for="ov-iron">Iron deposits</label></div>
+		<div style="display:flex; align-items:center; gap:8px;"><input disabled id="ov-copper" type="checkbox" /><label for="ov-copper">Copper deposits</label></div> -->
+		<div style="display:flex; align-items:center; gap:8px;"><input id="ov-landtemp" type="checkbox" /><label for="ov-landtemp">Land temperature</label></div>
+		<div style="display:flex; align-items:center; gap:8px;"><input id="ov-seatemp" type="checkbox" /><label for="ov-seatemp">Sea temperature</label></div>
+		<div style="display:flex; align-items:center; gap:8px;"><input id="ov-pop_2000" type="checkbox" /><label for="ov-pop_2000">Population 2000</label></div>
+		<div style="display:flex; align-items:center; gap:8px;"><input id="ov-night" type="checkbox" /><label for="ov-night">Black Marble</label></div>
+	</div>
+
 </body>
 </html>

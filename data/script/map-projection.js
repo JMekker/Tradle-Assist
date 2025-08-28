@@ -3,7 +3,7 @@ const overlays = {
 	copper: { id:"copper", texture:"./data/asset/overlay/copper_deposits_5400.png", blendTo:"emission", distance:2 },
 	landtemp: { id:"landtemp", texture:"./data/asset/overlay/land_surface_temp_5400.png", blendTo:"emission", distance:1 },
 	seatemp: { id:"seatemp", texture:"./data/asset/overlay/sea_surface_temp_5400.png", blendTo:"emission", distance:1 },
-	pop_2000: { id:"pop_2000", texture:"./data/asset/overlay/SEDAC_POP_2000.png", blendTo:"base", distance:4 },
+	pop_2000: { id:"pop_2000", texture:"./data/asset/overlay/sedac_pop_2000.png", blendTo:"base", distance:4 },
 	night: { id:"night", texture:"./data/asset/overlay/BlackMarble_2016_3km.jpg", blendTo:"base", distance:3 }
 };
 
